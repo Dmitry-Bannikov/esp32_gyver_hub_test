@@ -19,10 +19,12 @@ void setup() {
 }
 
 void loop() {
+	
 	boardTick();
 	portalTick();
 	WiFi_tick();
 	Mqtt_tick();
+	
 }
 
 //сделать поддержку пирометра?

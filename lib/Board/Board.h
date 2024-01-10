@@ -16,10 +16,13 @@
 
 
 #include <Arduino.h>
-#include <EEManager.h>
 #include <vector>
 #include <string>
 #include <sstream>
+
+#define MAX						0
+#define AVG						1
+#define MIN						2
 
 #define I2C_DATA_START						0x30
 #define I2C_MAINSETS_START					0x35
@@ -72,8 +75,8 @@ struct data {
 };
 
 struct stats {
-	uint32_t workTimeMins = 0;
-	uint32_t boardEvents = 0;
+	uint32_t WorkTimeMins = 0;
+	uint32_t Events = 0;
 	int16_t Uin[3] 		= {0,0,300};	//max,avg,min
 	int16_t Uout[3] 	= {0,0,300};
 	float 	Current[3] 	= {0,0,0};
@@ -87,25 +90,30 @@ struct stats {
 		buffer = new uint8_t[structSize];
 	}
 	void packData() {
-		memcpy(buffer, (uint8_t*)&workTimeMins, structSize);
+		memcpy(buffer, (uint8_t*)&WorkTimeMins, structSize);
 	}
 	void unpackData() {
-		memcpy((uint8_t*) &workTimeMins, buffer, structSize);
+		memcpy((uint8_t*) &WorkTimeMins, buffer, structSize);
 	}
 };
 
 //----------------------BOARD MAIN SETS----------------------//
 struct mainsets {
-	int8_t ignoreSetsFlag = 0;		//игнорировать настройки с платы (0...1)
-	int8_t precision = 3;			//точность/гистерезис (1...6)
-	int8_t tuneInVolt = 0;			//подстройка входа (-6...6)
-	int8_t tuneOutVolt = 0;		    //подстройка выхода (-6...6)
-	uint8_t targetVoltage = 222;		//целевое напряжение (0...3) смотри addSets
-	uint8_t motorType = 1;				//тип мотора (0...3)
-	uint8_t transRatioIndx = 3;			//коэффициент трансворматора тока (0...6) смотри addSets
-	uint8_t	maxCurrent = 30;
-	char liter = 'N';
-	//uint8_t i2c_addr;
+	uint8_t IgnoreSetsFlag = 0;		//игнорировать настройки с платы (0...1)
+	uint8_t EnableTransit = 0;	//транзит при перегрузке
+	uint8_t Hysteresis = 3;			//точность/гистерезис (1...6)
+	uint8_t Target = 222;			//целевое напряжение (210...240) 
+	uint8_t MotorType = 2;			//тип мотора (1...4)
+	uint8_t TransRatioIndx = 3;		//коэффициент трансворматора тока (0...6) смотри addSets
+	uint8_t	MaxCurrent = 30;
+	int8_t TuneInVolt = 0;			//подстройка входа (-6...6)
+	int8_t TuneOutVolt = 0;		    //подстройка выхода (-6...6)
+	char	Liter = 'N';
+	int16_t MinVolt = 170;			//мин напряжение
+	int16_t MaxVolt = 250;			//макс напряжение
+	int16_t EmergencyTOFF = 500;	//время аварийного отключения
+	int16_t EmergencyTON = 2000;	//время включения после аварии
+	
 	uint8_t structSize;
 	uint8_t *buffer = nullptr;
 	mainsets() {
@@ -113,22 +121,19 @@ struct mainsets {
 		buffer = new uint8_t[structSize];					//выделяем место под буфер
 	}
 	void packData() {
-		memcpy(buffer, (uint8_t*) &ignoreSetsFlag, structSize);
+		memcpy(buffer, (uint8_t*) &IgnoreSetsFlag, structSize);
 	}
 	void unpackData() {
-		memcpy((uint8_t*) &ignoreSetsFlag, buffer, structSize);
+		memcpy((uint8_t*) &IgnoreSetsFlag, buffer, structSize);
 	}
 };
 
 struct addsets {
-	int16_t minVolt = 198;				//мин напряжение
-	int16_t maxVolt = 242;				//макс напряжение
-	int16_t emergencyTOFF = 500;		//время аварийного отключения
-	int16_t emergencyTON = 2000;		//время включения после аварии
-	int16_t overloadTransit = 0;		//транзит при перегрузке
-	int16_t motKoefsList[4] = {20,90,150,200};			//коэффициент мощности мотора в % от motorDefPwr
-	int16_t tcRatioList[6] = {25,40,50,60,80,100};		//список коэффициентов трансов
-	int32_t SerialNumber[2] = {0, 0};
+	int16_t password = 1234;
+	int16_t motKoefsList[5] = {};			//коэффициент мощности мотора в % от motorDefPwr
+	int16_t motorMaxCurrentList[4] = {}; //список макс токов на каждый из типов моторов
+	int16_t tcRatioList[6] = {};		//список коэффициентов трансов
+	int32_t SerialNumber[2] = {};
 	uint8_t structSize;
 	uint8_t Switches[8] = {0,0,0,0,0,0,0,0};
 	uint8_t *buffer = nullptr;
@@ -138,10 +143,10 @@ struct addsets {
 		packData();
 	}
 	void packData() {
-		memcpy(buffer, (uint8_t*) &minVolt, structSize);
+		memcpy(buffer, (uint8_t*)&password, structSize);
 	}
 	void unpackData() {
-		memcpy((uint8_t*) &minVolt, buffer, structSize);
+		memcpy((uint8_t*)&password, buffer, structSize);
 	}
 };
 
@@ -172,8 +177,8 @@ private:
 	"Перегрузка",
 	"Внеш. сигнал"
 	};
-	uint8_t _txbuffer[100];
-	uint8_t _rxbuffer[100];
+	uint8_t _txbuffer[TX_BUF_SIZE];
+	uint8_t _rxbuffer[RX_BUF_SIZE];
 	uint8_t _board_addr = 0;
 	static const int _poll = 200;
 	bool startFlag = false;
@@ -206,14 +211,12 @@ public:
 	uint8_t 	sendCommand();
 	void 		getDataStr();
 	void 		getStatisStr();
-	String 		createJsonData(uint8_t mode);
-	void		getMotKoefList(String &result);
-	void 		getMotTypesList(String &result);
+	void 		createJsonData(String& result, uint8_t mode);
+	void 		getMotTypesList(String &result, bool mode);
+	void 		setMotKoefsList(String &str);
 	void	 	getTcRatioList(String &result);
-	void 		setLiteral(String lit);
 	void 		setLiteral(char lit);
-	String 		getLiteral();
-	char 		getLiteralCh();
+	char 		getLiteral();
 	void 		tick();
 	void 		detach();
 	~Board();

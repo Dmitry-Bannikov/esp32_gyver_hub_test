@@ -19,12 +19,6 @@ int8_t Board::StartI2C() {
 	if (i2c_param_config(I2C_NUM_0, &config) != ESP_OK) return 1;
     if (i2c_driver_install(I2C_NUM_0, config.mode, 100, 0, 0) != ESP_OK) return 2;
 	i2c_set_timeout(I2C_NUM_0, 0xFFFF);
-	
-	/*
-	Wire.begin();
-	Wire.setTimeOut(100);
-	i2c_set_timeout(I2C_NUM_0, 8000000);
-	*/
 	return 0;
 }
 
@@ -64,7 +58,6 @@ uint8_t Board::isBoard(uint8_t addr) {
 	rxbuf[2] = 78;
 	esp_err_t ret = i2c_master_write_read_device(0, addr, txbuf, sizeof(txbuf), rxbuf, sizeof(rxbuf), pdMS_TO_TICKS(20));
 	if (ret != ESP_OK) return 0;
-	Serial.println("Found!!!");
 	if (rxbuf[0] == 0x20 && rxbuf[1] == 0xF0) return rxbuf[2];
 	return 0;
 }
@@ -208,101 +201,76 @@ void Board::getDataStr() {
 }
 
 void Board::getStatisStr() {
+	float maxPwr = mainStats.Power[MAX]/1000.0;
+	float avgPwr = mainStats.Power[AVG]/1000.0;
+	String s = "";
+	s += F(" Cтатистика ");
+	s += F("\nt работы:");
+	s += getWorkTime(mainStats.WorkTimeMins);
 /*
-
 U вход   |	220	220	220
 U выход  | 
 Вых. Ток |	
 Мощность |
 События  | A01, A03, A04
-
 */
-
-	float maxPwr = mainStats.Power[0]/1000.0;
-	float avgPwr = mainStats.Power[1]/1000.0;
-	String s = "";
-	s += F(" Cтатистика ");
-	s += F("\nt работы:");
-	s += getWorkTime(mainStats.workTimeMins);
-	
-	s += F("\nU вх.макс : ");
-	s += String(mainStats.Uin[0]);
-
-	s += F("\nU вх.сред : ");
-	s += String(mainStats.Uin[1]);
-
-	s += F("\nU вх.мин  : ");
-	s += String(mainStats.Uin[2]);
-
-	s += F("\nU вых.макс: ");
-	s += String(mainStats.Uout[0]);
-
-	s += F("\nU вых.сред: ");
-	s += String(mainStats.Uout[1]);
-
-	s += F("\nU вых.мин : ");
-	s += String(mainStats.Uout[2]);
-	
-
-	s += F("\nI макс, А : ");
-	s += String(mainStats.Current[0], 1);
-	
-
-	s += F("\nI сред, А : ");
-	s += String(mainStats.Current[1], 1);
-	
-
-	s += F("\nP макс,kVA: ");
-	s += String(maxPwr,1);
-
-	s += F("\nP сред,kVA: ");
-	s += String(avgPwr,1);
-
+	char statis[100];
+	sprintf(statis,
+	"\n_____| max avg min"
+	"\nUin  | %d %d %d "
+	"\nUout | %d %d %d "
+	"\nI    | %1.f %1.f "
+	"\nP    | %1.f %1.f ", 
+	mainStats.Uin[MAX], mainStats.Uin[AVG], mainStats.Uin[MIN],
+	mainStats.Uout[MAX], mainStats.Uout[AVG], mainStats.Uout[MIN],
+	mainStats.Current[MAX], mainStats.Current[AVG],
+	maxPwr, avgPwr
+	);
+	s += String(statis);
 	s += F("\nСобытия: ");
-	s += errorsToStr(mainStats.boardEvents, EVENTS_SHORT);
-	
-	mainStats.Str = s;
+	s += errorsToStr(mainStats.Events, EVENTS_SHORT);
+	mainData.Str = s;
 }
 
 
-
-
-
-String Board::createJsonData(uint8_t mode) {
+void Board::createJsonData(String& result, uint8_t mode) {
 	
 	char json[300];
-	char fase = mainSets.liter;
+	char fase = mainSets.Liter;
 	if (mode == 0) {
 		float Pwr = mainData.Power/1000.0;
-		float maxPwr = mainStats.Power[0]/1000.0;
-		float avgPwr = mainStats.Power[1]/1000.0;
-		sprintf(json, "{"
+		float maxPwr = mainStats.Power[MAX]/1000.0;
+		float avgPwr = mainStats.Power[AVG]/1000.0;
+		sprintf(json, 
+					"{"
 					"\"Mode\":\"Data\","
 					"\"Fase\":\"%c\",\"Uin\":\"%d\",\"Uout\":\"%d\",\"I\":\"%.1f\",\"P\":\"%.1f\","
 					"\"Uin_avg\":\"%d\",\"Uout_avg\":\"%d\",\"I_avg\":\"%.1f\",\"P_avg\":\"%.1f\","
 					"\"Uin_max\":\"%d\",\"Uout_max\":\"%d\",\"I_max\":\"%.1f\",\"P_max\":\"%.1f\","
 					"\"work_h\":\"%d\""
-					"}", fase, mainData.Uin, mainData.Uout, mainData.Current, Pwr,
-						mainStats.Uin[1],mainStats.Uout[1],mainStats.Current[1],avgPwr,
-						mainStats.Uin[0],mainStats.Uout[0],mainStats.Current[0],maxPwr,
-						mainStats.workTimeMins/60
-					);
+					"}\0", 
+				fase, mainData.Uin, mainData.Uout, mainData.Current, Pwr,
+				mainStats.Uin[AVG],mainStats.Uout[AVG],mainStats.Current[AVG],avgPwr,
+				mainStats.Uin[MAX],mainStats.Uout[MAX],mainStats.Current[MAX],maxPwr,
+				mainStats.WorkTimeMins/60
+		);
 	} else if (mode == 1) {
-		int trRatio = addSets.tcRatioList[mainSets.transRatioIndx];
-		sprintf(json, "{"
-					"\"MODE\":\"SETS\","
+		int trRatio = addSets.tcRatioList[mainSets.TransRatioIndx];
+		sprintf(json, 
+					"{"
+					"\"Mode\":\"Sets\","
 					"\"FASE\":\"%c\",\"Uout_minoff\":\"%d\",\"Uout_maxoff\":\"%d\",\"Accuracy\":\"%d\",\"Uout_target\":\"%d\","
 					"\"Uin_tune\":\"%d\",\"Uout_tune\":\"%d\",\"t_5\":\"%d\",\"SN_1\":\"%d\",\"SN_2\":\"%d\","
 					"\"M_type\":\"%d\",\"Time_on\":\"%.1f\",\"Time_off\":\"%.1f\",\"Rst_max\":\"%d\",\"Save\":\"%d\","
 					"\"Transit\":\"%d\",\"Password\":\"%d\",\"Outsignal\":\"%d\""
-					"}", fase, addSets.maxVolt, addSets.minVolt, mainSets.precision, mainSets.targetVoltage, mainSets.tuneInVolt,
-					mainSets.tuneOutVolt, trRatio, addSets.SerialNumber[0], addSets.SerialNumber[1], mainSets.motorType,
-					addSets.emergencyTON/1000.0, addSets.emergencyTOFF/1000.0, 0, 0, addSets.Switches[SW_TRANSIT], 0, addSets.Switches[SW_OUTSIGN]
-					);
+					"}\0", 
+				fase, mainSets.MaxVolt, mainSets.MinVolt, mainSets.Hysteresis, mainSets.Target, mainSets.TuneInVolt,
+				mainSets.TuneOutVolt, trRatio, addSets.SerialNumber[0], addSets.SerialNumber[1], mainSets.MotorType,
+				mainSets.EmergencyTON/1000.0, mainSets.EmergencyTOFF/1000.0, 
+				addSets.Switches[SW_RSTST], 0, addSets.Switches[SW_TRANSIT], addSets.password, addSets.Switches[SW_OUTSIGN]
+		);
 	}
-	
-	String data = String(json);
-	return data;
+	result = String(json);
 }
 
 
@@ -317,43 +285,47 @@ void Board::detach() {
 	startFlag = false;
 }
 
-String Board::getLiteral() {
-	return String(mainSets.liter);
-}
-
-char Board::getLiteralCh() {
-	return mainSets.liter;
-}
-
-void Board::setLiteral(String lit) {
-	mainSets.liter = lit.charAt(0);
+char Board::getLiteral() {
+	return mainSets.Liter;
 }
 
 void Board::setLiteral(char lit) {
-	mainSets.liter = lit;
+	mainSets.Liter = lit;
 }
 
-void Board::getMotKoefList(String &result) {
+void Board::getMotTypesList(String &result, bool mode) {
 	result = "";
-	for (uint8_t i = 0; i < sizeof(addSets.motKoefsList)/sizeof(addSets.motKoefsList[0]); i++) {
-		result += String(addSets.motKoefsList[i]);
-		result += String(",");
+	if (mode == true) {
+		for (uint8_t i = 1; i < sizeof(addSets.motKoefsList) / sizeof(addSets.motKoefsList[0]); i++) {
+			result += String(i) + "(";
+			result += String(addSets.motKoefsList[i]);
+			result += "),";
+		}
+		if (result.length()) {
+			result.remove(result.length() - 1);
+		}
+	} else {
+		for (uint8_t i = 1; i < sizeof(addSets.motKoefsList) / sizeof(addSets.motKoefsList[0]); i++){
+			result += String(addSets.motKoefsList[i]);
+			result += String(",");
+		}
+		if (result.length()) {
+			result.remove(result.length() - 1);
+		}
 	}
-	if (result.length()) {
-		result.remove(result.length() - 1);
-	}
+	
 }
 
-void Board::getMotTypesList(String &result) {
-	result = "";
-	for (uint8_t i = 0; i < sizeof(addSets.motKoefsList)/sizeof(addSets.motKoefsList[0]); i++) {
-		result += String(i+1) + "(";
-		result += String(addSets.motKoefsList[i]);
-		result += "),";
-	}
-	if (result.length()) {
-		result.remove(result.length() - 1);
-	}
+void Board::setMotKoefsList(String &str) {
+	char strArr[20];
+	int16_t array[5];
+	str.toCharArray(strArr, sizeof(strArr));
+	sscanf(strArr, "%d,%d,%d,%d", 
+	array[1],array[2],array[3],array[4]);
+	addSets.motKoefsList[1] = constrain(array[1], 0, 300);
+	addSets.motKoefsList[2] = constrain(array[2], 0, 300);
+	addSets.motKoefsList[3] = constrain(array[3], 0, 300);
+	addSets.motKoefsList[4] = constrain(array[4], 0, 300);
 }
 
 void Board::getTcRatioList(String &result) {
@@ -367,24 +339,25 @@ void Board::getTcRatioList(String &result) {
 	}
 }
 
+
 //========Private=======//
 
 
 void Board::validate() {
-	mainSets.ignoreSetsFlag = constrain(mainSets.ignoreSetsFlag, 0, 1);
-	mainSets.motorType = constrain(mainSets.motorType, 0, 3);
-	mainSets.precision = constrain(mainSets.precision, 1, 10);
-	mainSets.targetVoltage = constrain(mainSets.targetVoltage, 210, 240);
-	mainSets.transRatioIndx = constrain(mainSets.transRatioIndx, 0, sizeof(addSets.tcRatioList)/sizeof(addSets.tcRatioList) - 1);
-	mainSets.maxCurrent = constrain(mainSets.maxCurrent, 1, 30);
-	mainSets.tuneInVolt = constrain(mainSets.tuneInVolt, -6, 6);
-	mainSets.tuneOutVolt = constrain(mainSets.tuneOutVolt, -6, 6);
+	mainSets.IgnoreSetsFlag = constrain(mainSets.IgnoreSetsFlag, 0, 1);
+	mainSets.MotorType = constrain(mainSets.MotorType, 0, 3);
+	mainSets.Hysteresis = constrain(mainSets.Hysteresis, 1, 10);
+	mainSets.Target = constrain(mainSets.Target, 210, 240);
+	mainSets.TransRatioIndx = constrain(mainSets.TransRatioIndx, 0, sizeof(addSets.tcRatioList)/sizeof(addSets.tcRatioList[0]) - 1);
+	mainSets.MaxCurrent = constrain(mainSets.MaxCurrent, 1, 30);
+	mainSets.TuneInVolt = constrain(mainSets.TuneInVolt, -6, 6);
+	mainSets.TuneOutVolt = constrain(mainSets.TuneOutVolt, -6, 6);
 	
-	addSets.emergencyTOFF = constrain(addSets.emergencyTOFF, 500, 5000);
-	addSets.emergencyTON = constrain(addSets.emergencyTON, 500, 5000);
-	addSets.minVolt = constrain(addSets.minVolt, 160, mainSets.targetVoltage);
-	addSets.maxVolt = constrain(addSets.maxVolt, mainSets.targetVoltage, 260);
-	addSets.overloadTransit = constrain(addSets.overloadTransit, 0, 1);
+	mainSets.EmergencyTOFF = constrain(mainSets.EmergencyTOFF, 500, 5000);
+	mainSets.EmergencyTON = constrain(mainSets.EmergencyTON, 500, 5000);
+	mainSets.MinVolt = constrain(mainSets.MinVolt, 160, mainSets.Target);
+	mainSets.MaxVolt = constrain(mainSets.MaxVolt, mainSets.Target, 260);
+	mainSets.EnableTransit = constrain(mainSets.EnableTransit, 0, 1);
 	addSets.SerialNumber[0] = constrain(addSets.SerialNumber[0], 0, 999999999);
 	addSets.SerialNumber[1] = constrain(addSets.SerialNumber[1], 0, 999999);
 }
@@ -455,6 +428,10 @@ uint8_t Board::scanBoards(std::vector<Board> &brd, const uint8_t max) {
 	}
 	if (brd.size() == max) return brd.size();
 	StopI2C();
+	pinMode(21|22, INPUT);
+	Serial.print("\nI2C pins state: ");
+	Serial.print(digitalRead(21));
+	Serial.println(digitalRead(22));
 	StartI2C();
 	uint32_t tmrStart = millis();
 	for (uint8_t addr = 1; addr < 128; addr++) {				//проходимся по возможным адресам
@@ -469,15 +446,15 @@ uint8_t Board::scanBoards(std::vector<Board> &brd, const uint8_t max) {
 			}
 			if (!reserved) {
 				brd.emplace_back(addr);					//если не зарезервировано, то создаем новую плату с этим адресом
-				brd[brd.size() - 1].setLiteral((char)ret);
+				brd[brd.size() - 1].setLiteral((char)ret);	
 				//return 1;//test
 			}
 		}
-		if (millis() - tmrStart > 5000) return 0; //если сканирование заняло более 5 секунд - отменяем.
+		if (millis() - tmrStart > 2500) return 0; //если сканирование заняло более 5 секунд - отменяем.
 	}
 
 	auto compareByLiteral = [](Board& board1, Board& board2) {
-        return board1.getLiteralCh() < board2.getLiteralCh();
+        return board1.getLiteral() < board2.getLiteral();
     };
 
     // Сортируем вектор

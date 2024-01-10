@@ -1,8 +1,14 @@
 #pragma once
+#include <GyverPortal.h>
+#include <TimeTicker.h>
 #include <EEManager.h>
 #include <Board.h>
 #include <Display.h>
 
+
+
+GyverPortal ui;
+//GPtime time(ui.getSystemTime());
 #define RELEASE
 
 #define AP_DEFAULT_SSID     "Stab_AP_FREE"			// Стандартное имя точки доступа ESP (До 20-ти символов)

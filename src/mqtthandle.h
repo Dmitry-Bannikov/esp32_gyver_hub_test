@@ -97,16 +97,17 @@ void Mqtt_tick() {
 bool createFaseMqttData(char fase) {
     int8_t board_number = -1;
     for (uint8_t i = 0; i < board.size(); i++) {
-        if(board[i].getLiteral() == String(fase)) { //ищем номер платы с такой буквой
+        if(board[i].getLiteral() == fase) { //ищем номер платы с такой буквой
             board_number = i;
             break;
         }
     }
     if (board_number == -1) return false;
     String topic = "stab_brd/data/fase_";
+	String data;
     topic += String(fase) + "/";
     topic += WiFi.macAddress();
-    String data = board[board_number].createJsonData(0);
+    board[board_number].createJsonData(data, 0);
     mqttClient.publish(topic.c_str(), data.c_str());
     return true;
 }

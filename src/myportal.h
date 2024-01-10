@@ -14,7 +14,7 @@ void formsHandler();
 void clicksHandler();
 void updatesHandler();
 
-GyverPortal ui;
+
 
 
 void portalBuild() {
@@ -159,20 +159,25 @@ void clicksHandler() {
 	if (ui.clickBool("outsignal", board[activeBoard].addSets.Switches[SW_OUTSIGN])) 	boardRequest = 4;		//200V out
 	
 	if (ui.clickInt("b_sel", activeBoard)) board[activeBoard].getMainSets();
-	ui.clickBool("aset_transit", board[activeBoard].addSets.overloadTransit);
-	ui.clickInt("mset_targetV", board[activeBoard].mainSets.targetVoltage);
-	ui.clickInt("mset_prec", board[activeBoard].mainSets.precision);
-	ui.clickInt("mset_tunIn", board[activeBoard].mainSets.tuneInVolt);
-	ui.clickInt("mset_tunOut", board[activeBoard].mainSets.tuneOutVolt);
-	ui.clickInt("mset_tcratio_idx", board[activeBoard].mainSets.transRatioIndx);
-	ui.clickInt("mset_mottype", board[activeBoard].mainSets.motorType);
-	ui.clickInt("mset_maxcurr", board[activeBoard].mainSets.maxCurrent);					
-	ui.clickInt("aset_maxV", board[activeBoard].addSets.maxVolt);
-	ui.clickInt("aset_minV", board[activeBoard].addSets.minVolt);
-	ui.clickInt("aset_toff", board[activeBoard].addSets.emergencyTOFF);
-	ui.clickInt("aset_ton", board[activeBoard].addSets.emergencyTON);
+	ui.clickBool("mset_transit", board[activeBoard].mainSets.EnableTransit);
+	ui.clickInt("mset_targetV", board[activeBoard].mainSets.Target);
+	ui.clickInt("mset_prec", board[activeBoard].mainSets.Hysteresis);
+	ui.clickInt("mset_tunIn", board[activeBoard].mainSets.TuneInVolt);
+	ui.clickInt("mset_tunOut", board[activeBoard].mainSets.TuneOutVolt);
+	ui.clickInt("mset_tcratio_idx", board[activeBoard].mainSets.TransRatioIndx);
+	uint8_t motType_local = 0;
+	if (ui.clickInt("mset_mottype", motType_local)) board[activeBoard].mainSets.MotorType = motType_local+1;
+	ui.clickInt("mset_maxcurr", board[activeBoard].mainSets.MaxCurrent);					
+	ui.clickInt("mset_maxV", board[activeBoard].mainSets.MaxVolt);
+	ui.clickInt("mset_minV", board[activeBoard].mainSets.MinVolt);
+	ui.clickInt("mset_toff", board[activeBoard].mainSets.EmergencyTOFF);
+	ui.clickInt("mset_ton", board[activeBoard].mainSets.EmergencyTON);
 	
-}
+	if (ui.click("aset_motKoefs")) {
+		String motKoefs_list = ui.getString();
+		board[activeBoard].setMotKoefsList(motKoefs_list);
+	}
+ }
 
 void updatesHandler() {
 	if (!ui.update()) return;
