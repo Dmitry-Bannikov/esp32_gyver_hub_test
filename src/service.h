@@ -60,45 +60,37 @@ void connectionInit() {
 void memoryInit() {
 	LED_blink(1);
 	EEPROM.begin(512);
-	memoryWIFI.begin(0, 127);
+	memoryWIFI.begin(0, MEMORY_KEY);
 	LED_blink(0);
-	for (uint8_t i = 0; i < board.size(); i++) {	
-		//board[i].getDataRaw(); 
-		delay(250);
-	}
 }
 
 void boardTick() {
 	static uint32_t tmr = 0;
-	static uint32_t tmrGetSets = 0;
+	static uint32_t scanTmr = 0;
 	static uint8_t denyDataRequest = 0;
-	//sendDwinData();
 	uint8_t boardsAmnt = board.size();
-	if (millis() - tmr > 400 && !boardRequest) {
-		
-		
-		uint32_t tmrDisconn = millis();
+	if (millis() - tmr > 1000 && !boardRequest) {
 		for (uint8_t i = 0; i < board.size() && !denyDataRequest; i++) {
-			board[i].tick();
+			t = ui.getSystemTime();
+			board[i].tick(t.encode());
 		}
 		denyDataRequest > 0 ? denyDataRequest-- : (denyDataRequest = 0);
 		tmr = millis();
-	} else if (boardRequest){
+	} else if (boardRequest && board.size()){
 		denyDataRequest = 3;
 		BoardRequest(boardRequest);
 	}
 
-	if (millis() - tmrGetSets > 5000) {
-		//time(ui.getSystemTime());
-		//Serial.println(time.encode());
-		Serial.println();
-		for (uint8_t i = 0; i < board.size() && !denyDataRequest; i++) board[i].getMainSets();
+	if (millis() - scanTmr > 60000) {
+		for (uint8_t i = 0; i < board.size() && !denyDataRequest; i++) {
+			board[i].readAll();
+		}
+		scanNewBoards();
+		scanTmr = millis();
 	}
 }
 
 void scanNewBoards() {
-
-	Serial.println("Start scanning...");
 	static uint8_t old_amount = 0; 
 	static uint8_t counter = 0;
 	counter++;
@@ -107,12 +99,11 @@ void scanNewBoards() {
 		webRefresh = true;
 		old_amount = board.size();
 	} 
-	Serial.printf("Complete. Found: %d \n", board.size());
+	//Serial.printf("Complete. Found: %d \n", board.size());
 }
 
 void WiFi_Init() {
-	if (wifi_settings.staModeEn)
-	{
+	if (wifi_settings.staModeEn) {
 		WiFi.mode(WIFI_STA);
 		WiFi.begin(wifi_settings.staSsid, wifi_settings.staPass);
 		int attemptCount = 0;
@@ -130,13 +121,10 @@ void WiFi_Init() {
 			delay(1000);
 		}
 		Serial.println(WiFi.localIP());
-	}
-	// Иначе создаем свою сеть
-	else
-	{
+	} else {
 		WiFi.mode(WIFI_AP);
 		WiFi.softAP(wifi_settings.apSsid, wifi_settings.apPass);
-		delay(1000);
+		delay(100);
 		Serial.println(WiFi.softAPIP());
 	}
 }
@@ -163,7 +151,7 @@ void BoardRequest(uint8_t &request) {
 			requestResult = 1;
 		} else if (request == 4) {
 			uint8_t result = board[activeBoard].addSets.Switches[SW_OUTSIGN];
-			if(board[activeBoard].sendCommand()) {
+			if(board[activeBoard].sendSwitches()) {
 				board[activeBoard].addSets.Switches[SW_OUTSIGN] = !result;
 			}
 		}
@@ -174,20 +162,20 @@ void BoardRequest(uint8_t &request) {
 		if (!board[target].isAnswer()) return;
 		if (command == 1)
 		{
-			if (!board[target].getMainSets()) requestResult = 1;	
+			if (board[target].readAll()) requestResult = 1;	
 		}
 		else if (command == 2)
 		{
-			if(!board[target].sendMainSets()) requestResult = 1;
+			if(!board[target].sendMainSets() && !board[target].sendAddSets()) requestResult = 1;
 		}
 		else if (command == 3)
 		{
-			if(!board[target].sendCommand(SW_REBOOT, 1)) requestResult = 1;
+			if(!board[target].sendSwitches(SW_REBOOT, 1, 1)) requestResult = 1;
 			
 		}
 		else if (command == 4)
 		{
-			while (board[target].sendCommand(SW_RSTST, 1));
+			board[target].sendSwitches(SW_RSTST, 1, 1);
 		}
 	}
 	

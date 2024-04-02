@@ -3,12 +3,11 @@
 #include <TimeTicker.h>
 #include <EEManager.h>
 #include <Board.h>
-#include <Display.h>
 
 
 
 GyverPortal ui;
-//GPtime time(ui.getSystemTime());
+GPtime t;
 #define RELEASE
 
 #define AP_DEFAULT_SSID     "Stab_AP_FREE"			// Стандартное имя точки доступа ESP (До 20-ти символов)
@@ -22,7 +21,7 @@ GyverPortal ui;
 #define STA_DEFAULT_PASS    "" 
 #define STA_CONNECT_EN      0 
 #endif
-#define MEMORY_KEY          126                     //ключ памяти (от 0 до 255), если изменить, то настройки сбросятся
+#define MEMORY_KEY          127                     //ключ памяти (от 0 до 255), если изменить, то настройки сбросятся
 
 struct wifisets {                                   // Структура со всеми настройками wifi
     bool staModeEn = STA_CONNECT_EN;                // Подключаться роутеру по умолчанию?
@@ -36,6 +35,7 @@ struct wifisets {                                   // Структура со �
 std::vector<Board> board;					//объекты плат
 EEManager memoryWIFI(wifi_settings, 20000);
 
+
 uint8_t activeBoard = 0;
 bool mqttConnected = false;
 bool webRefresh = true;  
@@ -45,26 +45,3 @@ bool isSerial = true;
 #define unitBytes(byteH, byteL)				(byteH << 8 | byteL )
 #define getByteLow(value)						( value & 0xFF )
 #define getByteHigh(value)						( (value >> 8) & 0xFF )
-
-uint8_t global_add_pointer = 0;
-
-template<typename T>
-T reverseBytes(T& value) {
-    uint8_t* front = reinterpret_cast<uint8_t*>(&value);
-    uint8_t* back = front + sizeof(T) - 1;
-    while (front < back) {
-        std::swap(*front, *back);
-        ++front;
-        --back;
-    }
-    return value;
-}
-
-template<typename T>
-void Buffer_addNewValue(T value, uint8_t* buffer, size_t bufferSize, uint8_t reset) {
-    uint8_t size = sizeof(T);
-    if (reset || global_add_pointer + size >= bufferSize - 1) global_add_pointer = 0;
-    reverseBytes(value);
-    std::memcpy(buffer + 4 + global_add_pointer, &value, size);
-    global_add_pointer += size;
-}
