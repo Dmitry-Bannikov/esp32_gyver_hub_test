@@ -4,7 +4,6 @@
 #include <data.h>
 #include <mqtthandle.h>
 #include <WiFiUdp.h>
-#include <NTPClient.h>
 
 
 
