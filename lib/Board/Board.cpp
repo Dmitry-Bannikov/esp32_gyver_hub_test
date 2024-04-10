@@ -202,10 +202,8 @@ uint8_t Board::getData() {
 	static uint8_t disconn = 0;
 	static uint32_t last_update = 0;
 	float result = readDataRaw();
-	if (millis() - last_update > 5000) {
-		result = readStatsRaw();
-		last_update = millis();
-	}
+	readStatsRaw();
+	
 	if (result == NAN) {
 		(disconn < 10) ? (disconn++) : (disconn = 10, _disconnected = 1);
 	} else {

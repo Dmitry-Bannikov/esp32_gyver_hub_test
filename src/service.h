@@ -72,6 +72,7 @@ void boardTick() {
 	if (millis() - tmr > 1000 && !boardRequest) {
 		for (uint8_t i = 0; i < board.size() && !denyDataRequest; i++) {
 			t = ui.getSystemTime();
+			//Serial.printf("\n Board %d: ", i);
 			board[i].tick(t.encode());
 		}
 		denyDataRequest > 0 ? denyDataRequest-- : (denyDataRequest = 0);
