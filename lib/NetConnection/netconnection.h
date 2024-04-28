@@ -2,7 +2,6 @@
 
 
 #include <Arduino.h>
-#include <EEmanager.h>
 #include <WiFiUdp.h>
 #include <WiFi.h>
 
@@ -14,7 +13,7 @@
 #define STA_DEFAULT_PASS    "orteamoscow"			// Стандартный пароль точки доступа роутера (До 20-ти символов)
 #define STA_CONNECT_EN      1						// 1/0 - вкл./выкл. подключение к роутеру 
 
-#define MEMORY_KEY          126                     //ключ памяти (от 0 до 255), если изменить, то настройки сбросятся
+#define MEMORY_KEY          127                     //ключ памяти (от 0 до 255), если изменить, то настройки сбросятся
 
 struct wifisets {                                       // Структура со всеми настройками wifi
     bool staModeEn = STA_CONNECT_EN;                // Подключаться роутеру по умолчанию?
@@ -30,9 +29,10 @@ struct global_vars {                                    //сюда добавл�
 };
 
 
-void WifiInit();
-void wifi_tick();
-void wifi_updateCFG();
+void WiFi_Init();
+void WiFi_Connect();
+void WiFi_Tick();
+void WiFi_Save();
 
 
 

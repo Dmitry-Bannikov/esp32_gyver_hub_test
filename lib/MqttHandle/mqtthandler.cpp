@@ -1,4 +1,5 @@
 #include "mqtthandler.h"
+#include <esp_task_wdt.h>
 #include <common_data.h>
 
 
@@ -20,25 +21,37 @@ const int mqtt_port = 15164;
 WiFiClient espClient;
 PubSubClient mqttClient(espClient);
 
-
+void OnMqttMessage(char* topic, uint8_t* payload, unsigned int len) {
+    mqttClient.flush();
+    payload[len] = 0;
+    String topicStr = String(topic);
+    int index = topicStr.indexOf("fase_") + 5;
+    Serial.println(topicStr);
+    Serial.println((char*)payload);
+    if (index == -1) return;
+    
+    char fase = topicStr.charAt(index);
+    int8_t board_num = -1;
+    for (int i = 0; i < board.size(); i++) {
+        if (board[i].mainSets.Liter == fase) {
+            board_num = i;
+            break;
+        }
+    }
+    if (board_num == -1) return;
+    if (topicStr.indexOf("getsets") != -1){
+        board[board_num].setJsonData(std::string((char*)payload));
+    }
+    mqttClient.flush();
+}
 
 void MqttInit() {
-    mqttClient.setServer(mqtt_broker, mqtt_port);
     mqttClient.setBufferSize(500);
-	uint8_t mac[6];
-	char macStr[6] = { 0 };
-	WiFi.macAddress(mac);
-	sprintf(macStr, "%02X%02X", mac[4], mac[5]);
-	mqtt_clientId = "stab_brd_" + String(macStr);
-	WiFi.macAddress();
+    mqttClient.setServer(mqtt_broker, mqtt_port);
+	mqtt_clientId = "Stab_brd_" + String(Board_SN);
+    SubscribeTopics();
+    mqttClient.setCallback(OnMqttMessage);
     MqttReconnect();
-    String esp_mac = WiFi.macAddress();
-	for (uint8_t i = 0; i < 3; i++) {
-		String sub_topic_sets = "stab_brd/getsets/fase_" + String((char)(65+i)) + "/";
-		mqttClient.subscribe(sub_topic_sets.c_str());
-	}
-	mqttClient.subscribe("stab_brd/getsets/fase_N");
-    mqttClient.setCallback(onMqttMessage);
 }
 
 void MqttReconnect() {
@@ -48,9 +61,11 @@ void MqttReconnect() {
     bool mqttConn = mqttClient.connected();
     if (mqttConn) {
         period = 60000;
+        SubscribeTopics();
     } else {
         period = 5000;
         if (!mqttClient.connect(mqtt_clientId.c_str(), mqtt_username, mqtt_password)) {
+            SubscribeTopics();
             Serial.print("  Mqtt failed, reason: ");
             Serial.println(mqttClient.state()); 
         }
@@ -67,30 +82,11 @@ void MqttPublishData() {
     tmr = millis();
 }
 
-void onMqttMessage(char* topic, uint8_t* payload, size_t len) {
-    String topicStr = String(topic);
-    int index = topicStr.indexOf("fase_") + 5;
-    if (index == -1) return;
-    char fase = topicStr.charAt(index);
-    int8_t board_num = -1;
-    for (int i = 0; i < board.size(); i++) {
-        if (board[i].mainSets.Liter == fase) {
-            board_num = i;
-            break;
-        }
-    }
-    if (board_num == -1) return;
-    
-    if (topicStr.indexOf("getsets") != -1){
-        board[board_num].setJsonData(std::string((char*)payload));
-    }
-    mqttClient.flush();
-}
-
 void Mqtt_tick() {
     mqttClient.loop();
     MqttReconnect();
     MqttPublishData();
+    esp_task_wdt_reset();
 }
 
 bool sendFaseMqttData(int8_t numBrd) {
@@ -100,20 +96,20 @@ bool sendFaseMqttData(int8_t numBrd) {
     String topic;
     std::string data;
     if (cnt < 120) {
-        topic = "stab_brd/data/fase_" + Lit + "/" + WiFi.macAddress();
+        topic = "stab_brd/data/fase_" + Lit + "/" + String(Board_SN);
         board[numBrd].getJsonData(data, 0);
         board[numBrd].Bdata.getMinMax();
         cnt++;
     } else {
-        topic = "stab_brd/sets/fase_" + Lit + "/" + WiFi.macAddress();
+        topic = "stab_brd/sets/fase_" + Lit + "/" + String(Board_SN);
         board[numBrd].getJsonData(data, 4);
         cnt = 0;
     }
     mqttConnected = sendMqttJson(topic.c_str(), data.c_str());
     if (cnt == 60) {
-        String topicMin = "stab_brd/datamin/fase_" + Lit + "/" + WiFi.macAddress();
+        String topicMin = "stab_brd/datamin/fase_" + Lit + "/" + String(Board_SN);
         std::string dataMin; board[numBrd].getJsonData(dataMin, 1);
-        String topicMax = "stab_brd/datamax/fase_" + Lit + "/" + WiFi.macAddress();
+        String topicMax = "stab_brd/datamax/fase_" + Lit + "/" + String(Board_SN);
         std::string dataMax; board[numBrd].getJsonData(dataMax, 2);
         mqttConnected = sendMqttJson(topicMin.c_str(), dataMin.c_str());
         mqttConnected = sendMqttJson(topicMax.c_str(), dataMax.c_str());
@@ -123,7 +119,7 @@ bool sendFaseMqttData(int8_t numBrd) {
         std::string alarm_text;
         uint8_t alarm_code = 0;
         String data;
-        String topic = "stab_brd/alarms/fase_" + Lit + "/" + WiFi.macAddress();
+        String topic = "stab_brd/alarms/fase_" + Lit + "/" + String(Board_SN);
         alarm_code = board[numBrd].getNextActiveAlarm(alarm_text, board[numBrd].mainData.Events);
         
         data = "{\"Code\":\"" + String(alarm_code) + "\",";
@@ -131,7 +127,7 @@ bool sendFaseMqttData(int8_t numBrd) {
         mqttClient.publish(topic.c_str(), data.c_str());
         sentNullAlarm[numBrd] = false;
     } else if (!sentNullAlarm[numBrd]) {
-        String topic = "stab_brd/alarms/fase_" + Lit + "/" + WiFi.macAddress();
+        String topic = "stab_brd/alarms/fase_" + Lit + "/" + String(Board_SN);
         String data = "{\"Code\":\"0\",\"Text\":\"\"}\0";
         mqttClient.publish(topic.c_str(), data.c_str());
         sentNullAlarm[numBrd] = true;
@@ -154,6 +150,13 @@ bool sendMqttJson(const char* topic, const char* data) {
     return isStart && mqttClient.endPublish();
 }
 
-
+void SubscribeTopics() {
+    for (uint8_t i = 0; i < 3; i++) {
+		String sub_topic_sets = "stab_brd/getsets/fase_" + String((char)(65+i)) + "/" + Board_SN;
+		mqttClient.subscribe(sub_topic_sets.c_str());
+        delay(10);
+	}
+    // String sub_topic_sets = "stab_brd/getsets/fase_N/" + Board_SN;
+}
 
 //-----------------------------------------------------------------------------------//

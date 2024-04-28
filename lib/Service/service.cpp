@@ -11,6 +11,10 @@
 
 
 void System_Init() {
+	uint8_t mac[6];
+	WiFi.macAddress(mac);
+	memcpy(&Board_SN, mac, 4);
+	Board_SN += *(uint16_t*)(mac+4);
 	pinMode(LED_BUILTIN, OUTPUT);
 	pinMode(21, INPUT);
 	pinMode(22, INPUT);
@@ -23,17 +27,17 @@ void Board_Init() {
 	board.reserve(MAX_BOARDS);
 	delay(10);
 	scanNewBoards();
+	for (uint8_t i = 0; i < board.size(); i++) {
+		board[i].readAll();
+		board[i].CurrClbrtKoeff = (float)board[i].mainSets.CurrClbrtKoeff/100.0;
+	}
 }
 
 void Web_Init() {
-	WifiInit();
-	MqttInit();
+	WiFi_Init();
 	portalInit();
-	uint8_t mac[6];
-	WiFi.macAddress(mac);
-	memcpy(&Board_SN, mac, 4);
+	MqttInit();
 	Serial.printf("\nStab SN: %d \n", Board_SN);
-	Serial.println(WiFi.macAddress());
 }
 
 
@@ -45,8 +49,7 @@ void Board_Tick() {
 	uint8_t boardsAmnt = board.size();
 	if (millis() - tmr > 1000 && !boardRequest) {
 		for (uint8_t i = 0; i < board.size() && !denyDataRequest; i++) {
-			t = ui.getSystemTime();
-			board[i].tick(t.encode());
+			board[i].tick("");
 		}
 		denyDataRequest > 0 ? denyDataRequest-- : (denyDataRequest = 0);
 		tmr = millis();
@@ -58,6 +61,7 @@ void Board_Tick() {
 	if (millis() - scanTmr > 60000) {
 		for (uint8_t i = 0; i < board.size() && !denyDataRequest; i++) {
 			board[i].readAll();
+			board[i].CurrClbrtKoeff = board[i].mainSets.CurrClbrtKoeff/100.0;
 		}
 		scanNewBoards();
 		scanTmr = millis();
@@ -65,11 +69,11 @@ void Board_Tick() {
 }
 
 void System_Tick() {
-
+	//MemoryTick();
 }
 
 void Web_Tick() {
-	wifi_tick();
+	WiFi_Tick();
 	Mqtt_tick();
 	portalTick();
 }
@@ -92,7 +96,7 @@ void BoardRequest(uint8_t &request) {
 		if (request == 3) {
 			for (uint8_t i = 0; i < board.size(); i++) {
 				delay(1);
-				if (board[i].sendMainSets()) return;
+				if (board[i].sendMainSets(0, 1, board[i].mainSets.Liter)) return;
 			}
 			requestResult = 1;
 		} else if (request == 4) {

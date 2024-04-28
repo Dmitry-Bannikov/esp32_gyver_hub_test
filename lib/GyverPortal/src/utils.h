@@ -29,7 +29,7 @@ GP_PGM(GP_GRAY, "#5e5e5e");
 GP_PGM(GP_GRAY_B, "#9c9ea1");
 GP_PGM(GP_BLACK, "#13161a");
 GP_PGM(GP_WHITE, "#fff");
-GP_PGM(GP_DEFAULT, "#fff");
+GP_PGM(GP_DEFAULT, "#000");
 
 enum GPalign {
     GP_CENTER,

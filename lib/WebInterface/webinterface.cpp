@@ -1,7 +1,11 @@
+#include "common_data.h"
 #include "webinterface.h" 
 #include "netconnection.h"
 #include "customs.h"
-#include "common_data.h"
+
+GyverPortal ui;
+
+int updatingDevice = -1;
 
 void portalBuild() {
   //------------------------------------------//
@@ -24,7 +28,10 @@ void portalBuild() {
 	
 	if(ui.uri("/")) {
 		GP.BLOCK_BEGIN(GP_THIN, "", "Мои устройства");
-		GP_CreateDevicesList();
+			GP_CreateDevicesList();
+		GP.BLOCK_END();
+		GP.BLOCK_BEGIN(GP_THIN, "", updatingDevice == -1 ? "Добавить устройство" : "Изменить устройство");
+			GP_AddNewDevice(updatingDevice);
 		GP.BLOCK_END();
 	}
 	
@@ -84,6 +91,8 @@ void portalInit() {
 	ui.start(globalData.webInterfaceDNS);
 	ui.enableOTA("admin", "1234");
 	ui.onlineTimeout(5000);
+	//UpdateDevice("tac4300ct", "example@mail.com", "multimeter", "http://tac4300ct.local/", "Registred", 4245242, 1234, 25);
+	//UpdateDevice("Stabilizer", "example@mail.com", "stab_brd", "/dashboard", "Registred", Board_SN, 1234, 25);
 }
 
 void portalTick() {
@@ -107,27 +116,25 @@ void createUpdateList(String &list) {
 
 void formsHandler() {
 	if (ui.form("/wificfg")) { // Если есть сабмит формы - копируем все в переменные
-			
 		ui.copyStr("apSsid", wifi_settings.apSsid);
 		ui.copyStr("apPass", wifi_settings.apPass);
 		ui.copyStr("staSsid", wifi_settings.staSsid);
 		ui.copyStr("staPass", wifi_settings.staPass);
 		String s = wifi_settings.staSsid;
 		if (s.length() > 1) {
-		wifi_settings.staModeEn = 1;
+			wifi_settings.staModeEn = 1;
 		} else {
-		wifi_settings.staModeEn = 0;
+			wifi_settings.staModeEn = 0;
 		}
-		LED_blink(1);
-		wifi_updateCFG();
-		delay(1000);
-		ESP.restart();
+		WiFi_Save();
+		WiFi_Connect();
 	}
 
 }
 
 void clicksHandler() {
-	
+	AddEditDevice_handler(updatingDevice);
+	DeleteEditDevice_handler();
 	if (ui.clickSub("brdLit")) {
 		for (uint8_t i = 0; i < board.size();i++) {
 			uint8_t num = 0;
@@ -137,7 +144,6 @@ void clicksHandler() {
 			}
 		}
 	}
-
 	if (ui.clickUp("rst_btn")) 		ESP.restart();			//esp restart
 	if (ui.clickUp("scan_btn")) 	boardRequest = 2;			//scan boards
 	if (ui.clickUp("saveall_btn")) 	boardRequest = 3;			//save to all boards
@@ -148,11 +154,8 @@ void clicksHandler() {
 	if (ui.clickUp("r_stat/1")) 	boardRequest = 41;
 	if (ui.clickUp("r_stat/2")) 	boardRequest = 42;
 	if (ui.clickBool("outsignal", board[activeBoard].addSets.Switches[SW_OUTSIGN])) 	boardRequest = 4;		//200V out
-	
-	if (ui.clickInt("b_sel", activeBoard)) {
-		board[activeBoard].readAll();
+	if (ui.clickInt("b_sel", activeBoard)) board[activeBoard].readAll();
 		
-	}
 	ui.clickBool("mset_transit", board[activeBoard].mainSets.EnableTransit);
 	ui.clickInt("mset_targetV", board[activeBoard].mainSets.Target);
 	ui.clickInt("mset_prec", board[activeBoard].mainSets.Hysteresis);
@@ -169,10 +172,10 @@ void clicksHandler() {
 	if (ui.clickFloat("mset_CurrClbrValue", board[activeBoard].CurrClbrtValue)) {
 		int16_t value = (int16_t)(board[activeBoard].CurrClbrtValue*100);
 		board[activeBoard].sendMainSets(14, 1, value);
-		int16_t newKoeff = board[activeBoard].readMainSets(15, 1);
-		board[activeBoard].CurrClbrtKoeff = ((float)newKoeff)/100.0;
+		Serial.println(board[activeBoard].readMainSets());
+
+		board[activeBoard].CurrClbrtKoeff = (float)board[activeBoard].mainSets.CurrClbrtKoeff/100.0;
 	}
-	//ui.clickFloat("mset_curClbrKoef", board[activeBoard].mainSets.CurrClbrtKoeff);
 	if (ui.click("aset_motKoefs")) {
 		String motKoefs_list = ui.getString();
 		board[activeBoard].setMotKoefsList(motKoefs_list);
@@ -206,3 +209,115 @@ void updatesHandler() {
 	ui.updateFloat("mset_CurrClbrKoeff", board[activeBoard].CurrClbrtKoeff, 2);
 	
 }
+
+void AddEditDevice_handler(int &device) {
+	if (!ui.form("/add_edit_device")) return;
+	int num = device;
+	String name;
+	String type;
+	ui.copyString("newName", name);
+	ui.copyString("newType", type);	
+	if (num == -1) {	//добавление устройства
+		UpdateDevice(name.c_str(), type.c_str(), OwnerEmail,  "", "REG", Board_SN, 0);
+	} else {			//изменение устройства
+		UpdateDevice(name.c_str(), type.c_str(), Devices[num].OwnerEmail,  String(Devices[num].Page), "EDIT", 
+			Devices[num].SN, Devices[num].IsActive);
+		device = -1;
+	}
+}
+
+void DeleteEditDevice_handler() {
+	if (ui.clickSub("delete_btn")) {
+		String place_str = ui.clickNameSub();
+		uint8_t place = place_str.toInt();
+		if (Devices.size() > 0 && place < Devices.size()) {
+			Devices.erase(Devices.begin() + place);
+		}
+		webRefresh = true;
+	}
+	if (ui.clickSub("edit_btn")) {
+		String place_str = ui.clickNameSub(); 
+		uint8_t place = place_str.toInt();
+		if (Devices.size() > 0 && place < Devices.size()) {
+			updatingDevice = place;
+		}
+		webRefresh = true;
+	}
+	if (ui.form("/cancel")) {
+		updatingDevice = -1;
+	}
+}
+
+void ClickSets_handler() {
+
+
+	
+	//==========Buttons and Selectors==================
+	if (ui.clickSub("setbtn")) {
+		if (ui.clickSub("setbtn_sel_lit")) {
+			for (uint8_t i = 0; i < board.size();i++) {
+				uint8_t num = 0;
+				if (ui.clickInt(String("setbtn_sel_lit/")+i, num)) {
+					if (num != 0) board[i].setLiteral(64+num);
+					else board[i].setLiteral('N');
+				}
+			}
+		}
+		if (ui.clickUp("setbtn_rstesp")) 	ESP.restart();						//esp restart
+		if (ui.clickUp("setbtn_scan")) 		boardRequest = 2;					//scan boards
+		if (ui.clickUp("setbtn_saveall")) 	boardRequest = 3;					//save to all boards
+		if (ui.clickBool("outsignal", board[activeBoard].addSets.Switches[SW_OUTSIGN])) boardRequest = 4;		//200V out
+		if (ui.clickUp("setbtn_curr_tx"))	boardRequest = 5;
+		if (ui.clickUp("setbtn_read") ) 	boardRequest = 10 + activeBoard;	//read settings from active board
+		if (ui.clickUp("setbtn_write"))  	boardRequest = 20 + activeBoard; 	//save settings to active board
+		if (ui.clickUp("setbtn_rstbrd")) 	boardRequest = 30 + activeBoard;	//reboot active board
+		
+		if (ui.clickSub("setbtn_reset"))	boardRequest = 40 + ui.clickNameSub().toInt();	//reset statistic
+		if (ui.clickInt("setbtn_sel_act", activeBoard)) board[activeBoard].readAll();
+	}
+	
+	//============Fields=====================================================
+	if (ui.clickSub("setfield")) {
+		ui.clickBool("setfield_transit", board[activeBoard].mainSets.EnableTransit);
+		ui.clickInt("setfield_targetV", board[activeBoard].mainSets.Target);
+		ui.clickInt("setfield_prec", board[activeBoard].mainSets.Hysteresis);
+		ui.clickInt("setfield_tunIn", board[activeBoard].mainSets.TuneInVolt);
+		ui.clickInt("setfield_tunOut", board[activeBoard].mainSets.TuneOutVolt);
+		ui.clickInt("setfield_tcratio_idx", board[activeBoard].mainSets.TransRatioIndx);
+		uint8_t motType_local = 0;
+		if (ui.clickInt("setfield_mottype", motType_local)) board[activeBoard].mainSets.MotorType = motType_local+1;
+		ui.clickInt("setfield_maxcurr", board[activeBoard].mainSets.MaxCurrent);					
+		ui.clickInt("setfield_maxV", board[activeBoard].mainSets.MaxVolt);
+		ui.clickInt("setfield_minV", board[activeBoard].mainSets.MinVolt);
+		ui.clickInt("setfield_toff", board[activeBoard].mainSets.EmergencyTOFF);
+		ui.clickInt("setfield_ton", board[activeBoard].mainSets.EmergencyTON);
+		ui.clickFloat("setfield_CurrClbrValue", board[activeBoard].CurrClbrtValue);
+		if (ui.click("setfield_motKoefs")) board[activeBoard].setMotKoefsList(ui.getString());
+			//int16_t value = (int16_t)(board[activeBoard].CurrClbrtValue*100);
+			//board[activeBoard].sendMainSets(14, 1, value);
+			//board[activeBoard].readMainSets(15, 1);
+			//board[activeBoard].CurrClbrtKoeff = (float)board[activeBoard].mainSets.CurrClbrtKoeff/100.0;
+		
+	}
+	
+}
+
+
+
+
+
+
+
+
+
+
+
+
+int getBtnIndxSub(const String &name) {
+	String indx = ui.clickNameSub();
+	return indx.toInt();
+}
+
+
+
+//============================================

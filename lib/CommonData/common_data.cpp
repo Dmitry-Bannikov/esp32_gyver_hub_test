@@ -1,10 +1,14 @@
 #include "common_data.h"
+#include "netconnection.h"
+#include "EEManager.h"
 
-
-GyverPortal ui;
-GPtime t;
 std::vector<Board> board;					//объекты плат
 std::vector<device> Devices;
+
+
+
+EEManager memoryDevices(Devices, 5000);
+
 
 uint8_t activeBoard = 0;
 bool mqttConnected = false;
@@ -12,6 +16,8 @@ bool webRefresh = true;
 uint8_t boardRequest = 0; //запрос на плату
 uint8_t requestResult = 0;
 uint32_t Board_SN = 0;
+char OwnerEmail[32] = "";
+
 
 void LED_blink(uint16_t period_on, uint16_t period_off) {
   	static uint64_t tick = 0;
@@ -33,46 +39,66 @@ void LED_blink(uint16_t period_on, uint16_t period_off) {
 	}
 }
 
+void Devices_Init() {
+    memoryDevices.begin(100, MEMORY_KEY);
+}
 
-int findDeviceIndxFromID(uint32_t id) {
+void Devices_Tick() {
+    memoryDevices.tick();
+}
+
+void Devices_Save() {
+    memoryDevices.updateNow();
+}
+
+int findDeviceIndxFromSN(uint32_t sn) {
     uint8_t count = Devices.size();
     for (uint8_t i = 0; i < count; i++) {
-        if (Devices[i].ID == id) {
+        if (Devices[i].SN == sn) {
             return i;
         }
     }
     return -1;
 }
 
-
-void UpdateDevice(const char* name, const char* owner, const char* type, const char* page, uint32_t serial_n, uint32_t id, int is_active, bool reg) {
-	//name, email, type, page, SN, ID, isActive, Reg
+void UpdateDevice(const String &name, const String &type, const String &owner, const String &page, const String &status, uint32_t serial_n, int is_active) {
+	//имя, тип, емайл владельца, страница веб-интерфейса, статус устройства, серийник усройства, время работы
     uint8_t count = Devices.size();
     int isExists = -1;
-    
-    isExists = findDeviceIndxFromID(id);
+    isExists = findDeviceIndxFromSN(serial_n); //ищем устройство по его серийнику
 
-    if (isExists != -1) {
-        Devices[isExists].setParameters(name, owner, type, page, serial_n, id, is_active, reg);
-    } else {
+    if (isExists != -1) {   //если устройство с таким серийником есть
+        Devices[isExists].setParameters(
+            name.c_str(), type.c_str(), 
+            owner == "" ? Devices[isExists].OwnerEmail : owner.c_str(), 
+            page == "" ? Devices[isExists].Page : page.c_str(),
+            status == "" ? Devices[isExists].Status : status.c_str(),
+            serial_n, is_active
+        );
+    } else {                //иначе добавляем в конец списка
         Devices.emplace_back();
-        uint8_t dev_num = Devices.size();
-        if (dev_num > 0) {
-            dev_num = dev_num - 1;
-            strcpy(Devices[dev_num].Name, name);
-            strcpy(Devices[dev_num].OwnerEmail, owner);
-            strcpy(Devices[dev_num].Type, type);
-            strcpy(Devices[dev_num].Page, page);
-            Devices[dev_num].SN = serial_n;
-            Devices[dev_num].ID = id;
-            Devices[dev_num].IsActive = is_active;
-            Devices[dev_num].Reg = reg;
+        int8_t num = Devices.size() - 1;
+        if (num >= 0) {
+            Devices[isExists].setParameters(
+                name.c_str(), type.c_str(), 
+                owner.c_str(), page.c_str(),
+                status.c_str(), serial_n, is_active
+            );
         }
     }
 }
 
-void DeleteDevice(uint32_t id) {
+void DeleteDevice(uint32_t sn) {
     int isExists = -1;
-    isExists = findDeviceIndxFromID(id);
+    isExists = findDeviceIndxFromSN(sn);
     if (isExists != -1) Devices.erase(Devices.begin() + isExists);
+}
+
+void DeleteDevice(uint8_t indx) {
+    if (indx >= Devices.size()) return;
+    Devices.erase(Devices.begin() + indx);
+}
+
+void CreateDevices(const char * json) {
+    
 }

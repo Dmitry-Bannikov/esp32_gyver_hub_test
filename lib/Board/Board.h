@@ -175,6 +175,7 @@ private:
 public:
 	Board() {attach(0, 'N');}
 	Board(const uint8_t addr) {attach(addr, 'N');};
+	Board(const uint8_t addr, const char literal) {attach(addr, literal);};
 	static int8_t StartI2C();		
 	static int8_t StopI2C();
 	bool 		attach(const uint8_t addr, const char Liter);								//подключить плату (указать адрес)

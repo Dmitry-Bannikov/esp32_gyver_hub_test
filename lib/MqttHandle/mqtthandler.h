@@ -11,8 +11,9 @@
 
 void MqttInit();
 void MqttPublishData();
-void onMqttMessage(char* topic, uint8_t* payload, size_t len);
+void OnMqttMessage(char* topic, uint8_t* payload, unsigned int len);
 void MqttReconnect();
 void Mqtt_tick();
 bool sendFaseMqttData(int8_t numBrd);
 bool sendMqttJson(const char* topic, const char* data);
+void SubscribeTopics();

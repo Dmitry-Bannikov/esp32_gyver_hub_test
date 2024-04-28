@@ -393,7 +393,7 @@ uint8_t Board::setJsonData(std::string input) {
 	for (const auto& pair : j.items()) {
         for (int i = 0; i < SETS_VALS; ++i) {
             if (pair.key() == jsonSetsNames[i]) {
-				Bdata.settings[i] = std::stof(pair.value().get<std::string>());
+				Bdata.settings[i] = std::stoi(pair.value().get<std::string>());
             }
         }
     }
@@ -406,7 +406,7 @@ uint8_t Board::setJsonData(std::string input) {
 	mainSets.TuneOutVolt = Bdata.settings[6]; addSets.tcRatioList[mainSets.TransRatioIndx] = Bdata.settings[7]; mainSets.MotorType = Bdata.settings[8]; 
 	mainSets.EmergencyTON = Bdata.settings[9]; mainSets.EmergencyTOFF = Bdata.settings[10]; addSets.password = Bdata.settings[11]; 
 	addSets.SerialNumber[0] = Bdata.settings[12]; addSets.SerialNumber[1] = Bdata.settings[13]; 
-	isNeedRstMax = Bdata.settings[14]; isNeedSave = Bdata.settings[15]; addSets.Switches[SW_OUTSIGN] = Bdata.settings[16];
+	isNeedRstMax = Bdata.settings[14]; isNeedSave = Bdata.settings[15]; isNeedOutsign = Bdata.settings[16];
 	for (uint8_t i = 0; i < sizeof(addSets.tcRatioList) / sizeof(addSets.tcRatioList[0]); i++) {
 		if (tcRatio == addSets.tcRatioList[i]) {
 			mainSets.TransRatioIndx = i;
@@ -594,8 +594,7 @@ uint8_t Board::scanBoards(std::vector<Board> &brd, const uint8_t max) {
 				}
 			}
 			if (!reserved) {
-				brd.emplace_back(addr);					//если не зарезервировано, то создаем новую плату с этим адресом
-				brd[brd.size() - 1].setLiteral((char)ret);	
+				brd.emplace_back(addr, (char)ret);					//если не зарезервировано, то создаем новую плату с этим адресом
 			}
 		}
 		if (millis() - tmrStart > 50) return 0; //если сканирование заняло более 5 секунд - отменяем.
