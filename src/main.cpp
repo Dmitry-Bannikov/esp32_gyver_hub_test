@@ -5,25 +5,19 @@ find WebServer.cpp at line 649 and comment log_e
 
 #include <esp_task_wdt.h>
 #include <Arduino.h>
-#include <myportal.h>
 #include <service.h>
 
 
 void setup() {
-	connectionInit();
-	WiFi_Init();
-	MqttInit();
-	memoryInit();
-	portalInit();
-	Serial.println(WiFi.macAddress());
+	System_Init();
+	Board_Init();
+	Web_Init();
 	esp_task_wdt_init(10, true);
     esp_task_wdt_add(NULL);
 }
 
 void loop() {
-	boardTick();
-	portalTick();
-	WiFi_tick();
-	Mqtt_tick();
+	Board_Tick();
+	Web_Tick();
 	esp_task_wdt_reset();
 }

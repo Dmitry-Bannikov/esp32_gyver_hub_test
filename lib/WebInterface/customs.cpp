@@ -1,37 +1,4 @@
-#pragma once
-
-#include <data.h>
-//#include <service.h>
-
-void GP_data_build();
-void GP_target_build();
-void GP_mainsets_build(Board &brd);
-void GP_addsets_build(Board &brd);
-
-void GP_details_start(const String &summary, const String &id);
-void GP_details_end();
-
-
-
-void GP_details_start(const String &summary, const String &id = "") {
-    String s;
-    s += F("<details style='margin: 1%; padding: 1%;'");
-    if (id != "") {
-        s += F("id = '");
-        s += F("' ");
-    }
-    s += F(">\n");
-    s += F("<summary>\n");
-    s += summary;
-    s += F("\n</summary>");
-    GP.SEND(s);
-}
-
-void GP_details_end() {
-    String s;
-    s += F("\n</details>");
-    GP.SEND(s);
-}
+#include "customs.h"
 
 void GP_data_build() {
 	GP.GRID_BEGIN();
@@ -162,6 +129,64 @@ void GP_addsets_build(Board &brd) {
 	GP.BLOCK_END();
 }
 
+void GP_SUBMIT_MINI_LINK(const String &text, const String &link, PGM_P st, const String &cls) {
+    *_GPP += F("<input type='submit' onclick='openNewTab()' value='");
+    *_GPP += text;
+    if (st != GP_GREEN) {
+        *_GPP += F("' style='background:");
+        *_GPP += FPSTR(st);
+    }
+    if (cls.length()) {
+        *_GPP += F("' class='");
+        *_GPP += cls;
+    }
+    *_GPP += F("' >\n");
+
+    *_GPP += F("<script>");
+    *_GPP += F("function openNewTab() {");
+    *_GPP += F("window.open('");
+    *_GPP += link;
+    *_GPP += F("', '_blank');");
+    *_GPP += F("return false;}");
+    *_GPP += F("</script>");
+    GP.send();
+}
+
+void GP_CreateDevicesList() {
+	UpdateDevice("tac4300ct", "example@mail.com", "http://stab_webserver.local/dashboard", "/", 4245242, 1234, 25, true);
+    UpdateDevice("stab_brd", "example@mail.com", "stabilizer", "/dashboard", Board_SN, 1235, 21, true);
+	for (uint8_t i = 0; i < Devices.size(); i++) {
+		GP_DeviceInfo(Devices[i], i);
+	}
+	
+}
+
+void GP_DeviceInfo(device & Device, int num) {
+    if (!Device.Reg) return;
+	GP.GRID_BEGIN();
+		GP.BLOCK_BEGIN(GP_DIV_RAW);
+			GP.TEXT("dev_name_" + String(num), "Name", Device.Name, "", 20);
+		GP.BLOCK_END();
+
+		GP.BLOCK_BEGIN(GP_DIV_RAW);
+			if (Device.IsActive) {
+				GP.LABEL("В работе");
+				GP.LED("", true);
+                GP.NUMBER("", "Hours", Device.IsActive, "20px");
+			} else {
+				GP.LABEL("Отключен");
+				GP.LED("", false);
+                GP.NUMBER("", "Hours", Device.IsActive, "20px", true);
+			}
+		GP.BLOCK_END();
+
+		GP.BLOCK_BEGIN(GP_DIV_RAW);
+			GP.BUTTON_MINI("dev_edit_btn_" + String(num), "Изменить");
+			GP.BUTTON_MINI("dev_delete_btn_" + String(num), "Удалить");
+			GP.BUTTON_MINI_LINK(Device.Page, "Открыть");
+		GP.BLOCK_END();
+	GP.GRID_END();
+}
 
 
 
@@ -174,5 +199,26 @@ void GP_addsets_build(Board &brd) {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//========================================
 
 

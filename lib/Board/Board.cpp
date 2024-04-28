@@ -90,7 +90,6 @@ uint8_t Board::isBoard(uint8_t addr) {
 	if (rxBuffer[0] == HEADER_MSETS && ret == 0) {
 		int16_t tempLiter = *(int16_t*)(rxBuffer+1);
 		if (tempLiter > 64 && tempLiter < 79) Liter = tempLiter; 
-		Serial.printf("Address: %d, Liter: %c \n", addr, (char)Liter);
 	}
 	delete(rxBuffer);
     return (uint8_t)Liter;
@@ -203,7 +202,6 @@ uint8_t Board::getData() {
 	static uint32_t last_update = 0;
 	float result = readDataRaw();
 	readStatsRaw();
-	
 	if (result == NAN) {
 		(disconn < 10) ? (disconn++) : (disconn = 10, _disconnected = 1);
 	} else {

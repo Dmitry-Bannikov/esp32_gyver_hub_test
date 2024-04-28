@@ -1,23 +1,18 @@
-#pragma once
-
-#include <Arduino.h>
-#include <WiFi.h>
-#include <data.h>
-#include <PubSubClient.h>
-
+#include "mqtthandler.h"
+#include <common_data.h>
 
 
 #define USE_ORTEA
 
 #ifdef USE_ORTEA
 const char *mqtt_broker = "ortea.ru";
-const char *mqtt_clientId = "esp32_stabbrd";
+String mqtt_clientId = "esp32_stab";
 const char *mqtt_username = "device_stab";
 const char *mqtt_password = "2#r]V\\r]+(Dw@WnAd5Kq";
 const int mqtt_port = 8880;
 #else
 const char *mqtt_broker = "m6.wqtt.ru";
-const char *mqtt_clientId = "esp32_stab_manager";
+String mqtt_clientId = "esp32_stab";
 const char *mqtt_username = "u_J94WNP";
 const char *mqtt_password = "TvTRzLsh";
 const int mqtt_port = 15164;
@@ -27,26 +22,22 @@ PubSubClient mqttClient(espClient);
 
 
 
-void MqttInit();
-void MqttPublishData();
-void onMqttMessage(char* topic, uint8_t* payload, size_t len);
-void MqttReconnect();
-void Mqtt_tick();
-bool createFaseMqttData(int8_t numBrd);
-bool sendMqttJson(const char* topic, const char* data);
-
-
 void MqttInit() {
     mqttClient.setServer(mqtt_broker, mqtt_port);
     mqttClient.setBufferSize(500);
+	uint8_t mac[6];
+	char macStr[6] = { 0 };
+	WiFi.macAddress(mac);
+	sprintf(macStr, "%02X%02X", mac[4], mac[5]);
+	mqtt_clientId = "stab_brd_" + String(macStr);
+	WiFi.macAddress();
     MqttReconnect();
     String esp_mac = WiFi.macAddress();
-    String topicSets_A = "stab_brd/getsets/fase_A/"+esp_mac;
-    String topicSets_B = "stab_brd/getsets/fase_B/"+esp_mac;
-    String topicSets_C = "stab_brd/getsets/fase_C/"+esp_mac;
-    mqttClient.subscribe(topicSets_A.c_str());
-    mqttClient.subscribe(topicSets_B.c_str());
-    mqttClient.subscribe(topicSets_C.c_str());
+	for (uint8_t i = 0; i < 3; i++) {
+		String sub_topic_sets = "stab_brd/getsets/fase_" + String((char)(65+i)) + "/";
+		mqttClient.subscribe(sub_topic_sets.c_str());
+	}
+	mqttClient.subscribe("stab_brd/getsets/fase_N");
     mqttClient.setCallback(onMqttMessage);
 }
 
@@ -59,29 +50,25 @@ void MqttReconnect() {
         period = 60000;
     } else {
         period = 5000;
-        if (!mqttClient.connect(mqtt_clientId, mqtt_username, mqtt_password)) {
+        if (!mqttClient.connect(mqtt_clientId.c_str(), mqtt_username, mqtt_password)) {
             Serial.print("  Mqtt failed, reason: ");
             Serial.println(mqttClient.state()); 
         }
     }
     tmr = millis();
-
-
 }
 
 void MqttPublishData() {
     static uint32_t tmr = 0;
     if (millis() < tmr + 1000) return;
     for (uint8_t i = 0; i < board.size(); i++) {
-        createFaseMqttData(i);
+        sendFaseMqttData(i);
     }
     tmr = millis();
 }
 
 void onMqttMessage(char* topic, uint8_t* payload, size_t len) {
     String topicStr = String(topic);
-    payload[len] = '\0';
-    //std::string payloadStr = std::string((char*)payload);
     int index = topicStr.indexOf("fase_") + 5;
     if (index == -1) return;
     char fase = topicStr.charAt(index);
@@ -106,7 +93,7 @@ void Mqtt_tick() {
     MqttPublishData();
 }
 
-bool createFaseMqttData(int8_t numBrd) {
+bool sendFaseMqttData(int8_t numBrd) {
     static uint8_t sentNullAlarm[3] = {0,0,0};
     static uint8_t cnt = 0;
     String Lit = String(board[numBrd].getLiteral());

@@ -24,7 +24,7 @@ extern String* _GPP;
 //#define GP_OTA_NAME F("My_sketch.ino")    // имя бинарника скетча чтобы случайно не загрузить другой
 //#define GP_OTA_FS_NAME F("My_sketch")    	// имя бинарника файловой системы чтобы случайно не загрузить другой
 //#define GP_OTA_FILES                      // использолвать файлы стилей и скриптов
-//#define GP_OTA_LIGHT                      // светлая тема
+#define GP_OTA_LIGHT                      // светлая тема
 
 // Error Codes
 //esp32
@@ -182,7 +182,7 @@ public:
         GP.BUILD_BEGIN(400);
         
         #ifndef GP_OTA_LIGHT
-        GP.THEME(GP_DARK);
+        //GP.THEME(GP_DARK);
         #else
         GP.THEME(GP_LIGHT);
         #endif

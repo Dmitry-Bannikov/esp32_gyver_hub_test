@@ -1,21 +1,7 @@
-#pragma once
-
-#include <customs.h>
-#include <LittleFS.h>
-#include <service.h>
-
-
-void portalBuild();
-void portalActions();
-void portalInit();
-void portalTick();
-void createUpdateList(String &list);
-void formsHandler();
-void clicksHandler();
-void updatesHandler();
-
-
-
+#include "webinterface.h" 
+#include "netconnection.h"
+#include "customs.h"
+#include "common_data.h"
 
 void portalBuild() {
   //------------------------------------------//
@@ -34,8 +20,15 @@ void portalBuild() {
 	} else {
 		GP.TITLE("Менеджер плат (STA)");
 	}
-	GP.NAV_TABS_LINKS("/,/brdcfg,/wificfg", "Главная,Настройки платы,Настройка подключения");
-	if (ui.uri("/")) {
+	GP.NAV_TABS_LINKS("/,/dashboard,/brdcfg,/wificfg", "Главная,Мониторинг,Настройки платы,Настройка подключения");
+	
+	if(ui.uri("/")) {
+		GP.BLOCK_BEGIN(GP_THIN, "", "Мои устройства");
+		GP_CreateDevicesList();
+		GP.BLOCK_END();
+	}
+	
+	if (ui.uri("/dashboard")) {
 		GP.HR();
 		GP.LABEL("Соединение по MQTT");
 		GP.LED("mqttConnected_led", mqttConnected);
@@ -63,7 +56,8 @@ void portalBuild() {
 			GP.BLOCK_END();
 
 			GP.BLOCK_BEGIN(GP_DIV_RAW);
-				GP.SUBMIT_MINI("SUBMIT & RESTART");
+				String open = "http://" + String(globalData.webInterfaceDNS) + ".local/";
+				GP_SUBMIT_MINI_LINK("Запомнить", open);
 			GP.BLOCK_END();
 			
 			GP.BLOCK_BEGIN(GP_DIV_RAW, "", "Подключение к WIFI");
@@ -87,11 +81,7 @@ void portalActions() {
 void portalInit() {
 	ui.attachBuild(portalBuild);
 	ui.attach(portalActions);
-	if (WiFi.getMode() == WIFI_MODE_STA) {
-		ui.start("stab_webserver");
-	} else {
-		ui.start();
-	}
+	ui.start(globalData.webInterfaceDNS);
 	ui.enableOTA("admin", "1234");
 	ui.onlineTimeout(5000);
 }
@@ -129,7 +119,7 @@ void formsHandler() {
 		wifi_settings.staModeEn = 0;
 		}
 		LED_blink(1);
-		memoryWIFI.updateNow();
+		wifi_updateCFG();
 		delay(1000);
 		ESP.restart();
 	}
@@ -149,7 +139,7 @@ void clicksHandler() {
 	}
 
 	if (ui.clickUp("rst_btn")) 		ESP.restart();			//esp restart
-	if (ui.clickUp("scan_btn")) 	scanNewBoards();			//scan boards
+	if (ui.clickUp("scan_btn")) 	boardRequest = 2;			//scan boards
 	if (ui.clickUp("saveall_btn")) 	boardRequest = 3;			//save to all boards
 	if (ui.clickUp("read_btn") ) 	boardRequest = 10 + activeBoard;	//read settings from active board
 	if (ui.clickUp("save_btn"))  	boardRequest = 20 + activeBoard; 	//save settings to active board
