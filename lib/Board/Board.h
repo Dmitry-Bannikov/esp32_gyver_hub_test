@@ -204,7 +204,7 @@ public:
 	void 		getJsonData(std::string & result, uint8_t mode);
 	uint8_t 	setJsonData(std::string input);
 	void 		getMotTypesList(String &result, bool mode);
-	void 		setMotKoefsList(String &str);
+	void 		setMotKoefsList(String str);
 	void	 	getTcRatioList(String &result);
 	uint8_t 	getNextActiveAlarm(std::string& result, uint32_t alarms);
 	void 		setLiteral(char lit);

@@ -462,7 +462,7 @@ void Board::getMotTypesList(String &result, bool mode) {
 	
 }
 
-void Board::setMotKoefsList(String &str) {
+void Board::setMotKoefsList(String str) {
 	char strArr[20];
 	int array[5];
 	str.toCharArray(strArr, sizeof(str));

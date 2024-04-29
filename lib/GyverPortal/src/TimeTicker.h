@@ -1,6 +1,7 @@
 #pragma once
 
 // GP Time module
+#include "Arduino.h"
 
 struct TimeTicker {
     void setUnix(uint32_t unixx) {
